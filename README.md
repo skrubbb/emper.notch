@@ -65,11 +65,6 @@ first launch. To open a downloaded build:
 Exact wording differs between macOS versions. Because Emper is open source, you can also read the code and build it
 yourself (see above).
 
-**Known limitation of ad-hoc signing:** macOS ties the permissions you grant Emper to its bundle identifier, not to
-a developer certificate. Malware that is already running on your Mac could pose as Emper and reuse those
-permissions. Emper asks for nothing at launch, so grant only the permissions for features you use, and remove them in
-System Settings › Privacy & Security if you stop using Emper. A Developer ID signature may come later.
-
 ## Updates
 
 Emper uses [Sparkle](https://sparkle-project.org) (MIT). At launch and once a day it reads a small update list
