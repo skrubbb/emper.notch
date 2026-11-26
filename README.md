@@ -3,7 +3,7 @@
 A free, open-source (GPL-3.0) dynamic island for the edges of your Mac screen. One small "Emper" per screen edge
 (top, left, right, bottom) and per display. It expands on hover into a set of tabs.
 
-Emper started as a tool for my own Mac: synced lyrics in the idle island, a screenshot shelf, and an island on every screen edge. It's shaped by what I use every day, so it won't cover every use case. Ideas and issues are welcome.
+Emper started as a tool for my own Mac. Synced lyrics, a screenshot shelf and an island on every screen edge are just a few of the things I wanted. It's shaped by what I use every day, so it won't cover every use case. Ideas and issues are welcome.
 
 Status: **early prototype (v0.1.1)**. Expect rough edges.
 
