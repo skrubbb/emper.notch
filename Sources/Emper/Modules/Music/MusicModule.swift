@@ -63,6 +63,7 @@ struct MusicView: View {
                 control("forward.fill") { np.command("next track") }
                 Spacer(minLength: 0)
             }
+            .overlay(alignment: .trailing) { dismissButton }
             // Round 23: which app is playing, on the left; the controls stay centred.
             .overlay(alignment: .leading) { SourceBadge() }
             ProgressRow()
@@ -93,6 +94,7 @@ struct MusicView: View {
                     control("backward.fill") { np.command("previous track") }
                     control(np.isPlaying ? "pause.fill" : "play.fill", size: 18) { np.command("playpause") }
                     control("forward.fill") { np.command("next track") }
+                    dismissButton
                 }
             }
                 if np.lyricsEnabled {
@@ -104,6 +106,19 @@ struct MusicView: View {
         }
         .foregroundStyle(Color.primary)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Paused: ✕ hides this app's track (idle and open) until it plays again.
+    @ViewBuilder private var dismissButton: some View {
+        if np.hasTrack, !np.isPlaying {
+            Button { np.dismiss() } label: {
+                Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
+                    .frame(width: 24, height: 28).contentShape(Rectangle())
+            }
+            .buttonStyle(PressScaleStyle())
+            .foregroundStyle(Color.primary.opacity(0.6))
+            .help("Hide until it plays again")
+        }
     }
 
     private func control(_ symbol: String, size: CGFloat = 14, action: @escaping () -> Void) -> some View {

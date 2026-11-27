@@ -248,6 +248,16 @@ enum SelfTest {
                                 check("pointer away: idle lets clicks through again", c.panel.ignoresMouseEvents)
                                 TimerService.shared.reset()
                                 NowPlaying.shared.simulate(title: "", playing: false)
+                                store.update(screen, .top) { $0.shrunk = true }
+                                after(0.3) {
+                                check("shrink: idle Emper becomes the thin line (saved per Emper)",
+                                      c.model.isCompact && c.model.size.height == IslandGeometry.compactDepth
+                                      && store.display(for: screen)[.top].shrunk)
+                                store.update(screen, .top) { $0.shrunk = false }
+                                after(0.3) {
+                                check("shrink off: back to the normal idle", !c.model.isCompact
+                                      && c.model.size == IslandGeometry.collapsedSize(c.model.config))
+                                check("music: ✕ hides a paused app until it plays again", NowPlaying.shared.selfTestDismiss())
                                 store.update(screen, .top) { $0.enabled = false }
                                 after(0.3) {
                                     check("toggle off removes the island", manager.controller(for: screen, edge: .top) == nil)
@@ -258,6 +268,8 @@ enum SelfTest {
                                     }
                                     print("dock=\(manager.dockEdge.rawValue)")
                                     exit(allOK ? 0 : 1)
+                                }
+                                }
                                 }
                                 }
                                 }

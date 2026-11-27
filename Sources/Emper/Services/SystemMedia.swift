@@ -25,6 +25,10 @@ final class SystemMedia {
     private var process: Process?
     private var input: FileHandle?
     private var buffer = Data()
+    /// Wanted on (music + system detection): a helper that dies is started again after a short pause.
+    private var wanted = false
+    private var startedAt = Date.distantPast
+    private var quickDeaths = 0
 
     static var helperPath: String? {
         let p = Bundle.main.resourceURL?.appendingPathComponent("libEmperMR.dylib").path
@@ -34,7 +38,8 @@ final class SystemMedia {
     var isRunning: Bool { process?.isRunning == true }
 
     func setActive(_ on: Bool) {
-        if on, !isRunning { start() } else if !on, isRunning { stop() }
+        wanted = on
+        if on, !isRunning { quickDeaths = 0; start() } else if !on, isRunning { stop() }
     }
 
     private func start() {
@@ -51,24 +56,37 @@ final class SystemMedia {
             guard !d.isEmpty else { return }
             DispatchQueue.main.async { MainActor.assumeIsolated { SystemMedia.shared.receive(d) } }
         }
-        p.terminationHandler = { _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { SystemMedia.shared.ended() } }
+        p.terminationHandler = { dead in
+            DispatchQueue.main.async { MainActor.assumeIsolated { SystemMedia.shared.ended(dead) } }
         }
         do { try p.run() } catch { return }
+        startedAt = Date()
         process = p
         input = inp.fileHandleForWriting
     }
 
     private func stop() {
+        wanted = false
         try? input?.close()   // EOF ends the helper
         input = nil
         process = nil
     }
 
-    private func ended() {
+    private func ended(_ dead: Process) {
+        guard process === dead else { return }   // an older helper, already replaced
         process = nil
         input = nil
         buffer.removeAll()
+        guard wanted else { return }
+        // Restart after 2 s; one that keeps dying within 10 s of starting gets 3 tries, then stays off.
+        quickDeaths = Date().timeIntervalSince(startedAt) < 10 ? quickDeaths + 1 : 0
+        guard quickDeaths <= 3 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            MainActor.assumeIsolated {
+                let s = SystemMedia.shared
+                if s.wanted, !s.isRunning { s.start() }
+            }
+        }
     }
 
     /// play, pause, toggle, next, previous, `seek <s>`, refresh.

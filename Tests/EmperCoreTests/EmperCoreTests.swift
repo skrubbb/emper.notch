@@ -155,6 +155,9 @@ struct ConfigTests {
         let partial = #"{"edge":"right","enabled":true}"#.data(using: .utf8)!
         let i = try JSONDecoder().decode(IslandConfig.self, from: partial)
         #expect(i.enabled && i.moduleIDs == ["music"])
+        #expect(!i.shrunk)   // older configs: not shrunk
+        var shrunk = i; shrunk.shrunk = true
+        #expect(try JSONDecoder().decode(IslandConfig.self, from: JSONEncoder().encode(shrunk)).shrunk)
 
         let old = #"{"edge":"top","moduleID":"spotify"}"#.data(using: .utf8)!
         #expect(try JSONDecoder().decode(IslandConfig.self, from: old).moduleIDs == ["music"])

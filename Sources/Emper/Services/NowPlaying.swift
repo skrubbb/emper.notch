@@ -71,6 +71,10 @@ final class NowPlaying: ObservableObject {
         return !systemAudioOn && Player.allCases.contains { $0.isRunning }
     }
 
+    /// ✕ in the Music tab: this app's paused track stays hidden until the app plays again.
+    private(set) var dismissed: String?
+    /// Spotify's track id from its notification (artwork when neither AppleScript nor Now Playing has it).
+    private var spotifyTrackID: String?
     private var position: Double = 0
     private var positionStamp = Date()
     private var trackKey = ""
@@ -153,6 +157,7 @@ final class NowPlaying: ObservableObject {
         }
         let state = info["Player State"] as? String ?? ""
         let playing = state == "Playing"
+        if dismissed == p.bundleID { if playing { dismissed = nil } else { return } }
         // Another app pausing/stopping must not hide the one that is playing.
         if (p != player || systemSource != nil), !playing, isPlaying { return }
         if state == "Stopped" || (info["Name"] as? String ?? "").isEmpty {
@@ -161,6 +166,7 @@ final class NowPlaying: ObservableObject {
         }
         player = p
         systemSource = nil
+        spotifyTrackID = p == .spotify ? info["Track ID"] as? String : nil
         let ms = (info[p == .spotify ? "Duration" : "Total Time"] as? Double) ?? 0
         update(title: info["Name"] as? String ?? "",
                artist: info["Artist"] as? String ?? "",
@@ -195,6 +201,7 @@ final class NowPlaying: ObservableObject {
     /// The app that starts playing takes over; a paused or stopped app only updates itself.
     func applySystem(_ i: SystemMedia.Info) {
         guard !offline, !i.bundle.isEmpty, musicViaSystem || Player(rawValue: i.bundle) == nil else { return }
+        if dismissed == i.bundle { if i.playing { dismissed = nil } else { return } }
         let mine = systemSource == i.bundle
         if i.title.isEmpty {
             if mine { clear(); systemSource = nil }
@@ -223,7 +230,20 @@ final class NowPlaying: ObservableObject {
         } else if NSRunningApplication.runningApplications(withBundleIdentifier: old).isEmpty {
             clear()
             systemSource = nil
+        } else if isPlaying {
+            // A browser / other player still open: its last state is unknown, so show it paused (✕ hides it).
+            position = currentPosition
+            positionStamp = Date()
+            isPlaying = false
         }
+    }
+
+    /// ✕: hide the paused track until its app plays again.
+    func dismiss() {
+        guard hasTrack, !isPlaying else { return }
+        dismissed = systemSource ?? player.bundleID
+        clear()
+        systemSource = nil
     }
 
     /// Works out the badge once per track (not per tick).
@@ -269,6 +289,27 @@ final class NowPlaying: ObservableObject {
         guard systemSource == Player.spotify.bundleID else { return false }
         applySystem(info("com.apple.QuickTimePlayerX", "", false))
         return systemSource == nil && player == .spotify && title == "Takeover Song"
+    }
+
+    /// Self-test hook: a browser plays then pauses; ✕ hides it, paused updates stay hidden, playing shows it.
+    func selfTestDismiss() -> Bool {
+        let saved = (offline, systemAudioOn, scriptingAllowed, lyricsEnabled)
+        lyricsEnabled = false; scriptingAllowed = false; systemAudioOn = true; offline = false
+        defer {
+            clear(); systemSource = nil; dismissed = nil
+            offline = saved.0; systemAudioOn = saved.1; scriptingAllowed = saved.2; lyricsEnabled = saved.3
+        }
+        func info(_ playing: Bool) -> SystemMedia.Info {
+            .init(bundle: "com.google.Chrome", playing: playing, title: "Video", artist: "YouTube", album: "",
+                  duration: 300, elapsed: 10, timestamp: nil, artwork: nil)
+        }
+        applySystem(info(true)); applySystem(info(false))
+        guard hasTrack, !isPlaying else { return false }
+        dismiss()
+        applySystem(info(false))
+        guard !hasTrack else { return false }
+        applySystem(info(true))
+        return hasTrack && isPlaying && dismissed == nil
     }
 
     /// Self-test hook: pretend this source is playing.
@@ -368,12 +409,30 @@ final class NowPlaying: ObservableObject {
             return
         }
         let urlString = url ?? (isRunning ? run("tell application id \"\(player.bundleID)\" to return artwork url of current track") : nil)
+        if urlString == nil, player == .spotify, let id = spotifyTrackID { return loadSpotifyCover(id, key: key) }
         // Artwork over HTTPS only (no plain-HTTP fetch of a URL reported by another app).
         guard let s = urlString, let u = URL(string: s), u.scheme?.lowercased() == "https" else { return }
         artworkTask = Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: u), let img = NSImage(data: data) else { return }
             guard let self, self.trackKey == key else { return }
             self.artwork = img
+        }
+    }
+
+    /// Spotify without AppleScript or Now Playing: the cover from Spotify's public oEmbed (sends only the
+    /// track id, to Spotify).
+    private func loadSpotifyCover(_ trackID: String, key: String) {
+        let id = trackID.replacingOccurrences(of: "spotify:track:", with: "")
+        guard !id.isEmpty, id.allSatisfy({ $0.isLetter || $0.isNumber }),
+              let url = URL(string: "https://open.spotify.com/oembed?url=https://open.spotify.com/track/\(id)") else { return }
+        artworkTask = Task { [weak self] in
+            struct OEmbed: Decodable { let thumbnail_url: String? }
+            guard let (d, _) = try? await URLSession.shared.data(from: url),
+                  let s = (try? JSONDecoder().decode(OEmbed.self, from: d))?.thumbnail_url,
+                  let u = URL(string: s), u.scheme?.lowercased() == "https",
+                  let (img, _) = try? await URLSession.shared.data(from: u), let image = NSImage(data: img) else { return }
+            guard let self, self.trackKey == key, self.artwork == nil else { return }
+            self.artwork = image
         }
     }
 
@@ -391,7 +450,8 @@ final class NowPlaying: ObservableObject {
         if duration > 0 { comps.queryItems?.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded())))) }
         guard let url = comps.url else { return }
         var req = URLRequest(url: url)
-        req.setValue("Emper/0.1 (macOS)", forHTTPHeaderField: "User-Agent")
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        req.setValue("Emper/\(version) (macOS)", forHTTPHeaderField: "User-Agent")
         lyricsStatus = "Loading lyrics…"
         let key = trackKey
         lyricsTask = Task { [weak self] in

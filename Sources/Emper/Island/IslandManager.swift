@@ -130,7 +130,7 @@ final class IslandManager {
                              dockCovered: dockCovers)
                     c.panel.appearance = store.config.theme.appearance
                     c.setHidden(store.config.hideInMissionControl && SpaceWatcher.shared.missionControl)
-                    c.setCompact(store.config.showInFullScreen && SpaceWatcher.shared.fullScreen.contains(screen.emperID))
+                    c.setCompact(c2.shrunk || (store.config.showInFullScreen && SpaceWatcher.shared.fullScreen.contains(screen.emperID)))
                 }
             }
         }

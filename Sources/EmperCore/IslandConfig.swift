@@ -93,6 +93,9 @@ public struct IslandConfig: Codable, Equatable, Sendable {
     /// beside the notch) or sits as a small line right under the notch. Round 24: under the notch by default
     /// (saved under a new key, so Empers saved with the round-23 default pick it up too).
     public var notchLyrics: NotchLyrics = .below
+    /// Shrink button (beside the pencil): the idle Emper stays a thin line, as in full screen, and opens
+    /// only when the pointer is pushed against the screen edge. Off by default.
+    public var shrunk: Bool = false
 
     /// Runtime only (not saved): set per panel by the manager.
     public var anchor: IslandAnchor = .center
@@ -274,7 +277,7 @@ public struct IslandConfig: Codable, Equatable, Sendable {
         case edge, enabled, moduleIDs, moduleID, musicDetection, collapsedWidth, collapsedHeight,
              offset, idleOpacity, cornerRadius, hoverInset, hoverInsetFar, openDelayMs, closeDelayMs, homeSlots,
              style, bottomLayout, bottomSide, rightModuleIDs, rightHomeSlots, homeScales, homeSizes, rightHomeSizes, homeEnabled, styleChoice, islandGap,
-             homeMain, rightHomeMain
+             homeMain, rightHomeMain, shrunk
         case notchLyrics = "notchLyrics2"
     }
 
@@ -308,6 +311,7 @@ public struct IslandConfig: Codable, Equatable, Sendable {
         try c.encode(styleChoice, forKey: .styleChoice)
         try c.encode(islandGap, forKey: .islandGap)
         try c.encode(notchLyrics, forKey: .notchLyrics)
+        try c.encode(shrunk, forKey: .shrunk)
     }
 
     public init(from decoder: Decoder) throws {
@@ -351,6 +355,7 @@ public struct IslandConfig: Codable, Equatable, Sendable {
         styleChoice = (try? c.decodeIfPresent(StyleChoice.self, forKey: .styleChoice)) ?? .general
         islandGap = (try? c.decodeIfPresent(Double.self, forKey: .islandGap)) ?? 6
         notchLyrics = (try? c.decodeIfPresent(NotchLyrics.self, forKey: .notchLyrics)) ?? .below
+        shrunk = (try? c.decodeIfPresent(Bool.self, forKey: .shrunk)) ?? false
     }
 }
 

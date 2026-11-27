@@ -373,6 +373,12 @@ struct TabBar: View {
             if hasHome { model.onSelect(ModuleRegistry.homeID) }
             model.beginEdit()
         }
+        let shrunk = model.config.shrunk
+        let shrink = circleButton("arrow.down.right.and.arrow.up.left", active: shrunk,
+                                  tip: shrunk ? "Shrunk · click to restore" : "Shrink", lead: true) {
+            model.onEditConfig { $0.shrunk.toggle() }
+        }
+        let lead = stack { pencil; if !editing { shrink } }
         let tabs = stack {
             inner {
                 ForEach(model.tabs) { tab in
@@ -393,12 +399,12 @@ struct TabBar: View {
         Group {
             switch part {
             case .all:
-                EndsCenterLayout(vertical: v, spacing: 6) { pencil; tabs; ends }
+                EndsCenterLayout(vertical: v, spacing: 6) { lead; tabs; ends }
             case .tabs:
                 // The tabs alone, centred on the column.
                 EndsCenterLayout(vertical: v, spacing: 6) { Color.clear.frame(width: 0, height: 0); tabs; Color.clear.frame(width: 0, height: 0) }
             case .controls:
-                VStack(spacing: 6) { pencil; ends }
+                VStack(spacing: 6) { lead; ends }
             }
         }
         // Round 22: short fade, not a ~0.6 s spring; every frame of it redrew the whole open Emper.
