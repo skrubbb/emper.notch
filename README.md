@@ -5,7 +5,7 @@ A free, open-source (GPL-3.0) dynamic island for the edges of your Mac screen. O
 
 Emper started as a tool for my own Mac. Synced lyrics, a screenshot shelf and an island on every screen edge are just a few of the things I wanted. It's shaped by what I use every day, so it won't cover every use case. Ideas and issues are welcome.
 
-Status: **early prototype (v0.1.1)**. Expect rough edges.
+Status: **early prototype (v0.1.2)**. Expect rough edges.
 
 ![Emper opening on hover and closing when the pointer leaves](docs/screenshots/hover-unhover.gif)
 
@@ -15,7 +15,7 @@ Status: **early prototype (v0.1.1)**. Expect rough edges.
 
 Emper is a young project. Each feature is marked with how well it has been tested.
 
-| Area | v0.1.1 |
+| Area | v0.1.2 |
 |---|---|
 | Hover / un-hover open and close, edge placement | Tested |
 | Multiple displays (one Emper set per display) | Tested |
@@ -26,7 +26,8 @@ Emper is a young project. Each feature is marked with how well it has been teste
 | **Bluetooth toast**: a short notice when a device connects, with battery when macOS reports it (off by default) | **Included** (experimental) |
 | **Full screen**: the Emper shrinks to a thin line with no idle activity; push the cursor against the edge to open it | Included, not yet tested by hand |
 | **Hide in Mission Control** (no permission needed; checked once a second) | Included |
-| Reminder, Timer, Calculator, Clipboard history, File shelf, System stats | In the code, **hidden in v0.1.1** (experimental) |
+| **Shrink** button (beside the pencil): keep an Emper as the thin full-screen line until you push the cursor against the edge, for apps macOS doesn't report as full screen | Included, not yet tested by hand |
+| Reminder, Timer, Calculator, Clipboard history, File shelf, System stats | In the code, **hidden in v0.1.2** (experimental) |
 
 **Synced lyrics** (optional, Settings › Music): the current line follows the song under the open Emper, and inside
 the idle Emper.

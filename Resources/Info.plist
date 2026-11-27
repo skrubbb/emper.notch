@@ -8,8 +8,8 @@
     <key>CFBundleExecutable</key><string>Emper</string>
     <key>CFBundleIconFile</key><string>Emper</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.1</string>
-    <key>CFBundleVersion</key><string>2</string>
+    <key>CFBundleShortVersionString</key><string>0.1.2</string>
+    <key>CFBundleVersion</key><string>3</string>
     <key>SUFeedURL</key><string>https://github.com/skrubbb/emper.notch/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key><string>jEmZ2cYq0no6AeIl2J6fenGevXpI5OZ+mB36/ZOwIaI=</string>
     <key>SUEnableAutomaticChecks</key><false/>
