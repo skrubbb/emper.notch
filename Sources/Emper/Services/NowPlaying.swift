@@ -146,7 +146,10 @@ final class NowPlaying: ObservableObject {
                     }
                 }
             }
-            return
+            // Now Playing follows this app: it covers track, artwork and controls.
+            if systemSource == p.bundleID { return }
+            // Another app holds Now Playing (e.g. QuickTime), so the app's own notification is the only
+            // up-to-date source; fall through. Controls then need direct control (Settings › Music).
         }
         let state = info["Player State"] as? String ?? ""
         let playing = state == "Playing"
@@ -195,6 +198,7 @@ final class NowPlaying: ObservableObject {
         let mine = systemSource == i.bundle
         if i.title.isEmpty {
             if mine { clear(); systemSource = nil }
+            else if let old = systemSource { lostNowPlaying(old) }
             return
         }
         guard mine || i.playing || !hasTrack else { return }
@@ -206,6 +210,20 @@ final class NowPlaying: ObservableObject {
                position: pos, duration: i.duration, artworkURL: nil)
         if let d = i.artwork, let img = NSImage(data: d) { artwork = img } else if changed { artwork = nil }
         if changed || source == .none { refreshSource() }
+    }
+
+    /// Another app took Now Playing without a track of its own (e.g. QuickTime with a paused video).
+    /// The shown source no longer gets updates or commands through it: Spotify / Music fall back to
+    /// their own notifications, an app that quit is cleared.
+    private func lostNowPlaying(_ old: String) {
+        if let p = Player(rawValue: old) {
+            player = p
+            systemSource = nil
+            refreshSource()
+        } else if NSRunningApplication.runningApplications(withBundleIdentifier: old).isEmpty {
+            clear()
+            systemSource = nil
+        }
     }
 
     /// Works out the badge once per track (not per tick).
@@ -232,6 +250,25 @@ final class NowPlaying: ObservableObject {
             update(title: title, artist: "Emper", album: "", playing: playing, position: 0, duration: 180, artworkURL: nil)
             if source == .none { source = .spotify }
         }
+    }
+
+    /// Self-test hook: Spotify via Now Playing, then QuickTime takes Now Playing with no track.
+    /// Emper must keep the Spotify track and stop routing commands through Now Playing.
+    func selfTestNowPlayingTakeover() -> Bool {
+        let saved = (offline, systemAudioOn, scriptingAllowed, lyricsEnabled)
+        lyricsEnabled = false; scriptingAllowed = false; systemAudioOn = true; offline = false
+        defer {
+            clear(); systemSource = nil
+            offline = saved.0; systemAudioOn = saved.1; scriptingAllowed = saved.2; lyricsEnabled = saved.3
+        }
+        func info(_ b: String, _ t: String, _ playing: Bool) -> SystemMedia.Info {
+            .init(bundle: b, playing: playing, title: t, artist: t.isEmpty ? "" : "Emper", album: "",
+                  duration: 180, elapsed: 0, timestamp: nil, artwork: nil)
+        }
+        applySystem(info(Player.spotify.bundleID, "Takeover Song", true))
+        guard systemSource == Player.spotify.bundleID else { return false }
+        applySystem(info("com.apple.QuickTimePlayerX", "", false))
+        return systemSource == nil && player == .spotify && title == "Takeover Song"
     }
 
     /// Self-test hook: pretend this source is playing.

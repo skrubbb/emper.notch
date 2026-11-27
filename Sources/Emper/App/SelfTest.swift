@@ -43,6 +43,8 @@ enum SelfTest {
             let old = try? JSONDecoder().decode(EmperConfig.self, from: Data("{}".utf8))
             check("permissions: config without the keys decodes with both off", old?.bluetoothToast == false && old?.musicAppControl == false)
             check("permissions: no AppleScript while direct control is off", !NowPlaying.shared.scriptingAllowed)
+            check("music: another app taking Now Playing (QuickTime) keeps the Spotify track, off Now Playing",
+                  NowPlaying.shared.selfTestNowPlayingTakeover())
         }
         let mcw = [W(number: 70, owner: "WindowManager", pid: 5, layer: 19, bounds: d1)]
         r = SpaceWatcher.evaluate(bars + mcw, displays: ds, me: 1, previous: ["B": 60])
