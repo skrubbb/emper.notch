@@ -158,31 +158,162 @@ struct SideCard: View {
 
 // MARK: Music (compact)
 
+/// Music in a side placeholder (0.1.3). The layout follows the card's own size:
+/// - small (1× on a top/bottom Emper): artwork, title, artist, controls with ✕
+/// - medium (1.5×): artwork + title/artist, the lyric line, controls with ✕, progress with times
+/// - large (1.75×–2×): ✕ beside the title, two lyric lines, controls beside the progress with times
+/// - stack (1× on a left/right Emper, ~218 × 154): title row, lyrics, controls, progress
+/// - portrait (1.5× on a left/right Emper, ~218 × 248): big centred artwork, then the same column
 struct MusicCompactView: View {
     @ObservedObject var np = NowPlaying.shared
 
-    var body: some View {
-        VStack(spacing: 4) {
-            Button { np.openPlayer() } label: { ArtworkView(size: 40) }
-                .buttonStyle(PressScaleStyle())
-                .help("Open the player")
-            Text(np.hasTrack ? np.title : "Nothing playing")
-                .font(.system(size: 10, weight: .semibold)).lineLimit(1)
-                .foregroundStyle(Color.primary.opacity(np.hasTrack ? 0.9 : 0.5))
-            Spacer(minLength: 0)
-            HStack(spacing: 0) {
-                button("backward.fill") { np.command("previous track") }
-                button(np.isPlaying ? "pause.fill" : "play.fill", size: 13) { np.command("playpause") }
-                button("forward.fill") { np.command("next track") }
-            }
-        }
-        .foregroundStyle(Color.primary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    enum Kind { case small, medium, mediumLyric, large, stack, portrait }
+
+    static func kind(_ s: CGSize) -> Kind {
+        if s.height >= 200 { return .portrait }
+        if s.height >= 130 { return .stack }
+        // Default top Emper: 1× ≈ 99, 1.25× ≈ 131, 1.5× ≈ 163, 1.75× ≈ 194, 2× ≈ 226 pt inside the card.
+        if s.width < 115 { return .small }
+        if s.width < 147 { return .medium }       // 1.25×: no lyric (Pang, 0.1.3 check)
+        if s.width < 180 { return .mediumLyric }
+        return .large
     }
 
-    private func button(_ s: String, size: CGFloat = 10, action: @escaping () -> Void) -> some View {
+    var body: some View {
+        GeometryReader { g in
+            Group {
+                switch Self.kind(g.size) {
+                case .small: small
+                case .medium: medium(lyric: false)
+                case .mediumLyric: medium(lyric: true)
+                case .large: large
+                case .stack: stack
+                case .portrait: portrait(g.size)
+                }
+            }
+            .frame(width: g.size.width, height: g.size.height, alignment: .top)
+        }
+        .foregroundStyle(Color.primary)
+    }
+
+    // MARK: layouts
+
+    private var small: some View {
+        VStack(spacing: 3) {
+            artButton(30)
+            titles(center: true, titleSize: 10, artistSize: 9)
+            Spacer(minLength: 0)
+            controls(play: 12, side: 9, w: 17, h: 20, badge: 11, gap: 4)
+        }
+    }
+
+    /// 1.25×: header, controls, progress. 1.5×: one lyric line between header and controls.
+    private func medium(lyric: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            header(art: 30)
+            if lyric { lyricLine.frame(height: 13).offset(y: 2) } else { Spacer(minLength: 0) }
+            controls(play: 13, side: 10, w: lyric ? 24 : 21, h: 18, badge: 12)
+            ProgressRow().frame(height: 16)
+        }
+    }
+
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            header(art: 32)
+            if np.lyricsEnabled { LyricsView(scale: 0.78).frame(height: 24).padding(.top, 3) } else { Spacer(minLength: 0) }
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                controls(play: 13, side: 10, w: 19, h: 18, badge: 12, gap: 5, centred: false)
+                ProgressRow().frame(height: 16)
+            }
+        }
+    }
+
+    private var stack: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            header(art: 38)
+            if np.lyricsEnabled { LyricsView(scale: 0.8).padding(.top, 4).frame(maxHeight: .infinity) } else { Spacer(minLength: 0) }
+            controls(play: 16, side: 12, w: 30, h: 24, badge: 14, gap: 10)
+            ProgressRow().frame(height: 16)
+        }
+    }
+
+    private func portrait(_ s: CGSize) -> some View {
+        // Artwork takes what the column leaves over (title 30, lyric 28, controls 26, progress 16, gaps).
+        let art = min(s.width * 0.5, max(s.height - 30 - 28 - 26 - 16 - 6 * 5, 44)).rounded()
+        return VStack(spacing: 6) {
+            artButton(art)
+            titles(center: true, titleSize: 12, artistSize: 10)
+            if np.lyricsEnabled { LyricsView(centered: true, scale: 0.8).frame(height: 28).padding(.top, 4) } else { Spacer(minLength: 0) }
+            Spacer(minLength: 0)
+            controls(play: 16, side: 12, w: 30, h: 26, badge: 14, gap: 10)
+            ProgressRow().frame(height: 16)
+        }
+    }
+
+    // MARK: parts
+
+    private func artButton(_ size: CGFloat) -> some View {
+        Button { np.openPlayer() } label: { ArtworkView(size: size) }
+            .buttonStyle(PressScaleStyle())
+            .help("Open the player")
+    }
+
+    /// Artwork with title and artist beside it; the whole row opens the player.
+    private func header(art: CGFloat) -> some View {
+        Button { np.openPlayer() } label: {
+            HStack(spacing: 8) {
+                ArtworkView(size: art)
+                titles(center: false, titleSize: 11, artistSize: 10)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .help("Open the player")
+    }
+
+    private func titles(center: Bool, titleSize: CGFloat, artistSize: CGFloat) -> some View {
+        VStack(alignment: center ? .center : .leading, spacing: 1) {
+            Text(np.hasTrack ? np.title : "Nothing playing")
+                .font(.system(size: titleSize, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(np.hasTrack ? 0.9 : 0.5))
+            if np.hasTrack, !np.artist.isEmpty {
+                Text(np.artist).font(.system(size: artistSize)).foregroundStyle(Color.primary.opacity(0.6))
+            }
+        }
+        .lineLimit(1)
+        .frame(maxWidth: center ? .infinity : nil, alignment: center ? .center : .leading)
+    }
+
+    /// Current lyric only (one row), or nothing when lyrics are off.
+    @ViewBuilder private var lyricLine: some View {
+        if np.lyricsEnabled {
+            IdleLyricLine(alignment: .leading, size: 10)
+        } else {
+            Color.clear
+        }
+    }
+
+    /// Source logo · previous · play/pause · next · ✕, the same order on every size. ✕ is always there
+    /// (dim until paused) so the buttons never move.
+    private func controls(play: CGFloat, side: CGFloat, w: CGFloat, h: CGFloat, badge: CGFloat, gap: CGFloat = 6, centred: Bool = true) -> some View {
+        HStack(spacing: 0) {
+            if centred { Spacer(minLength: 0) }
+            SourceBadge(size: badge, hitWidth: badge + 4, hitHeight: h)
+            Spacer().frame(width: gap)
+            button("backward.fill", size: side, w: w, h: h) { np.command("previous track") }
+            button(np.isPlaying ? "pause.fill" : "play.fill", size: play, w: w, h: h) { np.command("playpause") }
+            button("forward.fill", size: side, w: w, h: h) { np.command("next track") }
+            Spacer().frame(width: gap)
+            MusicDismissButton(size: max(side - 1, 8), width: w * 0.85, height: h)
+            if centred { Spacer(minLength: 0) }
+        }
+    }
+
+    private func button(_ s: String, size: CGFloat, w: CGFloat, h: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: s).font(.system(size: size)).frame(width: 24, height: 20).contentShape(Rectangle())
+            Image(systemName: s).font(.system(size: size)).frame(width: w, height: h).contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
     }

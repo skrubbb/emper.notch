@@ -468,6 +468,24 @@ private final class LoginItem: ObservableObject {
 
 // MARK: Music
 
+/// Music › Players: where Emper reads the track from (0.1.3, replaces two switches).
+private enum PlayerMode: CaseIterable, Hashable {
+    case any, anyDirect, directOnly
+
+    init(system: Bool, direct: Bool) {
+        self = system ? (direct ? .anyDirect : .any) : (direct ? .directOnly : .any)
+    }
+    var system: Bool { self != .directOnly }
+    var direct: Bool { self != .any }
+    var title: String {
+        switch self {
+        case .any: "Any app"
+        case .anyDirect: "Any app + direct control"
+        case .directOnly: "Spotify & Apple Music only"
+        }
+    }
+}
+
 private struct MusicPage: View {
     @ObservedObject var store: ConfigStore
 
@@ -485,14 +503,20 @@ private struct MusicPage: View {
                 caption("Lyrics come from lrclib.net, looked up by title and artist.")
             }
             Card {
-                Toggle("Detect audio from any app", isOn: Binding(get: { store.config.systemAudio },
-                                                                  set: { v in store.setGlobal { $0.systemAudio = v } }))
-                Toggle("Control Spotify & Apple Music directly", isOn: Binding(get: { store.config.musicAppControl },
-                                                                               set: { v in store.setGlobal { $0.musicAppControl = v } }))
+                // 0.1.3 (Pang): one choice instead of two switches that overlapped (any app already covers
+                // Spotify and Apple Music). Both off was never useful; it reads as "Any app".
+                Row("Players") {
+                    Picker("Players", selection: Binding<PlayerMode>(
+                        get: { PlayerMode(system: store.config.systemAudio, direct: store.config.musicAppControl) },
+                        set: { m in store.setGlobal { $0.systemAudio = m.system; $0.musicAppControl = m.direct } })) {
+                        ForEach(PlayerMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.menu).labelsHidden().fixedSize()
+                }
             } header: {
                 SectionTitle("Players")
             } footer: {
-                caption("Any app covers browsers, Spotify, Apple Music and other players through macOS's Now Playing, with no permission. Direct control talks to Spotify and Apple Music themselves; macOS asks for Automation access the first time. After a pause, the idle Emper keeps the play button for a minute.")
+                caption("Any app: browsers, Spotify, Apple Music and other players through macOS's Now Playing, no permission needed. Any app + direct control: the same, and Emper also talks to Spotify and Apple Music themselves for steadier controls. Spotify & Apple Music only: other players are ignored. Both direct options need Automation permission; macOS asks once for each player the first time it plays (Permissions › Automation). After a pause, the idle Emper keeps the play button for a minute.")
             }
         }
     }
@@ -529,51 +553,109 @@ private struct AboutPage: View {
                     if let r = updates.available {
                         HStack(spacing: 6) {
                             Circle().fill(Color.red).frame(width: 8, height: 8)
-                            Text("Version \(r.version) is available").font(.callout.weight(.medium))
+                            Text("Update available").font(.callout.weight(.medium))
                         }
                         .padding(.top, 4)
+                        .help("Version \(r.version)")
                         Button("Install Update…") { updates.installOrCheck() }
                             .buttonStyle(.borderedProminent)
-                        caption("Emper downloads the update, checks its signature, and restarts. Nothing installs until you confirm.")
                     } else {
                         Button(updates.status == .checking ? "Checking…" : "Check for Updates") { updates.installOrCheck() }
                             .buttonStyle(.borderedProminent)
                             .disabled(updates.status == .checking)
-                        caption(statusText)
+                        if let t = statusText { caption(t) }
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
-            Card("Updates") {
-                caption("Emper checks for a new version at launch and once a day by reading a small update list from GitHub. Nothing about you is sent, and nothing installs until you click Install Update.")
+            Card("What's new") {
+                ForEach(Changelog.recent, id: \.version) { r in
+                    ChangelogRow(release: r, current: r.version == updates.current)
+                }
             }
             Card("Links") {
                 LinkRow(title: "Licence", detail: "GPL-3.0")
-                LinkRow(title: "Source code", detail: "Coming with the first release")
+                LinkRow(title: "Source code", detail: "github.com/skrubbb/emper.notch",
+                        url: URL(string: "https://github.com/skrubbb/emper.notch"))
             }
         }
     }
 }
 
 extension AboutPage {
-    fileprivate var statusText: String {
+    /// 0.1.3: status only, no explanations.
+    fileprivate var statusText: String? {
         switch updates.status {
-        case .idle, .checking: return "Emper checks for new versions on its own."
-        case .upToDate: return "Emper is up to date." + (updates.lastChecked.map { " Last checked \($0.formatted(date: .omitted, time: .shortened))." } ?? "")
-        case .failed(let m): return "Could not check for updates: \(m)"
+        case .idle, .checking: return nil
+        case .upToDate: return "Emper is up to date"
+        case .failed: return "Couldn't check for updates"
         }
     }
+}
+
+/// One release in About › What's new: version row that folds open to its changes. The running version
+/// starts open.
+private struct ChangelogRow: View {
+    let release: Changelog.Release
+    let current: Bool
+    @StateObject private var fold = FoldState()
+
+    var body: some View {
+        let isOpen = fold.open ?? current
+        VStack(alignment: .leading, spacing: 8) {
+            Button { withAnimation(.easeOut(duration: 0.18)) { fold.open = !isOpen } } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                        .foregroundStyle(SK.muted)
+                    Text("Version \(release.version)").foregroundStyle(SK.text)
+                    if current {
+                        Text("Installed").font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Capsule().fill(SK.line))
+                            .foregroundStyle(SK.muted)
+                    }
+                    Spacer()
+                    Text(release.date).font(.system(size: 11)).foregroundStyle(SK.muted)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if isOpen {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(release.changes, id: \.self) { c in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•").foregroundStyle(SK.muted)
+                            Text(c).font(.system(size: 12)).foregroundStyle(SK.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.leading, 18)
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
+private final class FoldState: ObservableObject {
+    @Published var open: Bool?
 }
 
 private struct LinkRow: View {
     let title: String
     let detail: String
+    var url: URL? = nil
     var body: some View {
         HStack {
             Text(title).foregroundStyle(SK.text)
             Spacer()
-            Text(detail).foregroundStyle(SK.muted)
+            if let url {
+                Button(detail) { NSWorkspace.shared.open(url) }.buttonStyle(.link)
+            } else {
+                Text(detail).foregroundStyle(SK.muted)
+            }
         }
     }
 }
@@ -663,6 +745,34 @@ private struct EdgeBinder {
     func bind<T>(_ kp: WritableKeyPath<IslandConfig, T>) -> Binding<T> {
         Binding(get: { store.display(for: screen)[edge][keyPath: kp] },
                 set: { v in store.update(screen, edge) { $0[keyPath: kp] = v } })
+    }
+
+    /// 0.1.3 (Pang): the Hitbox rows show the area itself, so a smaller number is a smaller area.
+    /// Stored as the old trims (`hoverInset` per side, `hoverInsetFar` on the inner edge), measured on the
+    /// idle Emper; a live (wider/deeper) idle keeps the same trims.
+    func hitLength(style: IslandStyle) -> (value: Binding<Double>, max: Double) {
+        let c = config
+        let flare = style == .island ? 0 : IslandConfig.notchFlare
+        let full = max((c.edge.isVertical ? c.collapsedHeight : c.collapsedWidth) - 2 * flare, 8)
+        let v = Binding<Double>(
+            get: { max(full - 2 * store.display(for: screen)[edge].hoverInset, 8) },
+            set: { n in
+                store.update(screen, edge) { $0.hoverInset = max((full - min(max(n, 8), full)) / 2, 0) }
+                store.flashHitbox(screen, edge)
+            })
+        return (v, full)
+    }
+
+    func hitDepth() -> (value: Binding<Double>, max: Double) {
+        let c = config
+        let full = max(c.edge.isVertical ? c.collapsedWidth : c.collapsedHeight, 4)
+        let v = Binding<Double>(
+            get: { max(full - store.display(for: screen)[edge].hoverInsetFar, 4) },
+            set: { n in
+                store.update(screen, edge) { $0.hoverInsetFar = full - min(max(n, 4), full) }
+                store.flashHitbox(screen, edge)
+            })
+        return (v, full)
     }
 
     /// Same as `bind`, and flashes the hover zone on screen.
@@ -817,11 +927,10 @@ private struct EdgePage: View {
                             Toggle(isOn: tabBinding(id, right: right)) { Label(d.name, systemImage: d.symbol) }
                         }
                     }
-                    Toggle("Show music while it plays", isOn: b.bind(\.musicDetection))
                 } header: {
                     SectionTitle("Tabs")
                 } footer: {
-                    caption("Each switch adds the feature as a tab. Reorder tabs with the pencil in the Emper. Show music while it plays adds a Music tab and the idle track view even when Music isn't a tab.")
+                    caption("Each switch adds the feature as a tab. Reorder tabs with the pencil in the Emper. Music shows in the idle Emper while it plays when Music is a tab or a Home placeholder.")
                 }
                 Card {
                     NumberRow(label: edge.isVertical ? "Idle length" : "Idle width",
@@ -839,13 +948,13 @@ private struct EdgePage: View {
                     caption("The idle Emper can be at most as long as the open Emper.")
                 }
                 Card {
-                    NumberRow(label: edge.isVertical ? "Top & bottom" : "Left & right",
-                              value: b.bindFlash(\.hoverInset), range: 0...60, unit: "pt")
-                    NumberRow(label: "Inner edge", value: b.bindFlash(\.hoverInsetFar), range: 0...60, unit: "pt")
+                    let len = b.hitLength(style: style), dep = b.hitDepth()
+                    NumberRow(label: edge.isVertical ? "Height" : "Width", value: len.value, range: 8...len.max, unit: "pt")
+                    NumberRow(label: "Depth", value: dep.value, range: 4...dep.max, unit: "pt")
                 } header: {
                     SectionTitle("Hitbox")
                 } footer: {
-                    caption("Shrinks the area that opens the Emper. The inner edge is the side facing the middle of the screen. The green box on screen shows the area while you change these; the side touching the screen edge always counts.")
+                    caption("Size of the area that opens the Emper, measured on the idle Emper: smaller numbers, smaller area. Depth is how far it reaches from the screen edge; the side touching the screen edge always counts. The green box on screen shows the area while you change these." + (behindNotch ? " Behind the built-in notch the box is hidden: a small depth opens only from the very top." : ""))
                 }
                 Card("Hover Timing") {
                     NumberRow(label: "Open delay", value: b.bind(\.openDelayMs), range: 0...1000, unit: "ms", step: 10)
@@ -1113,6 +1222,66 @@ private final class PermissionsState: ObservableObject {
         }
     }
 
+    /// 0.1.3: "Allow" shows macOS's own prompt right away. macOS only prompts while the answer is
+    /// "Not asked yet"; after Denied, System Settings is the only way back (Open).
+    private var bluetooth: CBCentralManager?
+
+    func canAsk(_ item: PermissionItem) -> Bool {
+        guard let st = status[item.id] else { return false }
+        return st.contains("Not asked yet")
+    }
+
+    func request(_ item: PermissionItem) {
+        switch item.id {
+        case "reminders":
+            Task { @MainActor in
+                _ = try? await EKEventStore().requestFullAccessToReminders()
+                self.refresh()
+            }
+        case "automation":
+            let running = ["com.spotify.client", "com.apple.Music"].filter {
+                NSRunningApplication.runningApplications(withBundleIdentifier: $0).first != nil
+            }
+            guard !running.isEmpty else {
+                note[item.id] = "Open Spotify or Music first, then click Allow."
+                return
+            }
+            note[item.id] = nil
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Blocks until the user answers macOS's prompt.
+                for b in running {
+                    var desc = NSAppleEventDescriptor(bundleIdentifier: b).aeDesc!.pointee
+                    _ = AEDeterminePermissionToAutomateTarget(&desc, typeWildCard, typeWildCard, true)
+                }
+                DispatchQueue.main.async { MainActor.assumeIsolated { self.refresh() } }
+            }
+        case "files":
+            let shelf = ScreenshotShelf.shared
+            let folders = ([ScreenshotShelf.systemFolder()] + (shelf.destination.map { [$0] } ?? []))
+                .filter(ScreenshotShelf.isProtected)
+            shelf.allowAccess()
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Listing a protected folder is what makes macOS ask.
+                for f in folders { _ = try? FileManager.default.contentsOfDirectory(atPath: f.path) }
+                DispatchQueue.main.async { MainActor.assumeIsolated { self.refresh() } }
+            }
+        case "bluetooth":
+            // Creating a manager asks; it is dropped again once macOS has an answer.
+            bluetooth = CBCentralManager(delegate: nil, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: false])
+            pollBluetooth(tries: 60)
+        default:
+            open(item)
+        }
+    }
+
+    private func pollBluetooth(tries: Int) {
+        refresh()
+        guard tries > 0, CBManager.authorization == .notDetermined else { bluetooth = nil; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            MainActor.assumeIsolated { self?.pollBluetooth(tries: tries - 1) }
+        }
+    }
+
     func open(_ item: PermissionItem) {
         if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(item.pane)") { NSWorkspace.shared.open(u) }
     }
@@ -1156,7 +1325,7 @@ private struct PermissionsPage: View {
             } header: {
                 SectionTitle("Privacy")
             } footer: {
-                caption("Emper only asks when a feature needs it. Turn a permission off in System Settings, or use Reset so macOS forgets Emper's answer and asks again next time.")
+                caption("Allow shows macOS's prompt here. Once a permission is denied, macOS only lets you change it in System Settings (Open). Reset makes macOS ask again.")
             }
         }
         .onAppear { state.refresh() }
@@ -1176,8 +1345,14 @@ private struct PermissionsPage: View {
                 Text(st).font(.system(size: 11, weight: .medium))
                     .foregroundStyle(good ? Color(nsColor: .systemGreen) : SK.muted)
                     .lineLimit(2).multilineTextAlignment(.trailing)
-                Button("Open") { state.open(item) }.controlSize(.small)
-                    .help("Open this permission in System Settings")
+                if state.canAsk(item) {
+                    Button("Allow") { state.request(item) }.controlSize(.small)
+                        .buttonStyle(.borderedProminent)
+                        .help("macOS asks right here")
+                } else {
+                    Button("Open") { state.open(item) }.controlSize(.small)
+                        .help("Open this permission in System Settings")
+                }
                 Button(state.armed == item.id ? "Reset?" : "Reset") { state.reset(item) }
                     .controlSize(.small)
                     .tint(state.armed == item.id ? .red : nil)

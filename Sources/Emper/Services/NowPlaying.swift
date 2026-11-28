@@ -393,6 +393,18 @@ final class NowPlaying: ObservableObject {
         let num = { (s: String) in Double(s.replacingOccurrences(of: ",", with: ".")) ?? 0 }
         update(title: f[0], artist: f[1], album: f[2], playing: f[3] == "playing",
                position: num(f[4]), duration: num(f[5]) / p.scriptDurationScale, artworkURL: nil)
+        // Launch path: the badge (Spotify / Apple Music logo) must show right away, not after the next event.
+        refreshSource()
+    }
+
+    /// Self-test hook: a track read at launch (no notification yet) gets its source badge.
+    func selfTestLaunchSource() -> Bool {
+        let saved = (offline, lyricsEnabled, player)
+        lyricsEnabled = false; offline = true
+        defer { clear(); systemSource = nil; offline = saved.0; lyricsEnabled = saved.1; player = saved.2 }
+        clear(); systemSource = nil
+        apply(fields: ["Launch Song", "Emper", "", "playing", "0", "180000"], from: .spotify)
+        return source == .spotify
     }
 
     // MARK: Artwork & lyrics

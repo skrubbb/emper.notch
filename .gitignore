@@ -5,3 +5,4 @@ build/
 .swiftpm/
 *.log
 .sparkle-tools/
+graphify-out/

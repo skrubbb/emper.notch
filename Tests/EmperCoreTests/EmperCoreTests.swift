@@ -565,3 +565,13 @@ struct LyricsTests {
     let l = IslandGeometry.edgeHotZone(c, panel: CGRect(x: 0, y: 0, width: 100, height: 400))
     #expect(l.minX == -2 && l.maxX == 2)
 }
+
+struct ChangelogTests {
+    @Test func keepsAtMostFiveNewestFirst() {
+        #expect(Changelog.recent.count <= Changelog.keep)
+        #expect(Changelog.keep == 5)
+        let v = Changelog.all.map { $0.version.split(separator: ".").compactMap { Int($0) } }
+        #expect(zip(v, v.dropFirst()).allSatisfy { $0.lexicographicallyPrecedes($1) == false && $0 != $1 })
+        #expect(Changelog.all.allSatisfy { !$0.changes.isEmpty })
+    }
+}

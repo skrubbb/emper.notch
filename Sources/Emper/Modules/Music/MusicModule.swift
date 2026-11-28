@@ -108,18 +108,7 @@ struct MusicView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// Paused: ✕ hides this app's track (idle and open) until it plays again.
-    @ViewBuilder private var dismissButton: some View {
-        if np.hasTrack, !np.isPlaying {
-            Button { np.dismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
-                    .frame(width: 24, height: 28).contentShape(Rectangle())
-            }
-            .buttonStyle(PressScaleStyle())
-            .foregroundStyle(Color.primary.opacity(0.6))
-            .help("Hide until it plays again")
-        }
-    }
+    private var dismissButton: some View { MusicDismissButton() }
 
     private func control(_ symbol: String, size: CGFloat = 14, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -188,6 +177,8 @@ struct LyricsView: View {
     @ObservedObject var np = NowPlaying.shared
     /// Round 26: left/right Empers centre the lines.
     var centered = false
+    /// 0.1.3: side placeholders draw the lines smaller (Pang: "lirik side placeholder kecilin lagi").
+    var scale: CGFloat = 1
 
     var body: some View {
         // Driven by NowPlaying's lyricIndex (published only when the line changes); a 5 Hz TimelineView
@@ -195,25 +186,25 @@ struct LyricsView: View {
         Group {
             if np.lyrics.isEmpty {
                 Text(np.lyricsStatus.isEmpty ? " " : np.lyricsStatus)
-                    .font(.system(size: 12)).foregroundStyle(Color.primary.opacity(0.45))
+                    .font(.system(size: 12 * scale)).foregroundStyle(Color.primary.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: centered ? .center : .leading)
             } else {
                 let i = np.lyricIndex.flatMap { np.lyrics.indices.contains($0) ? $0 : nil }
                 let line = i.map { np.lyrics[$0] }
                 let current = line?.text ?? ""
                 VStack(alignment: centered ? .center : .leading, spacing: 3) {
-                    Text(current.isEmpty ? "♪" : current).font(.system(size: 13, weight: .semibold))
+                    Text(current.isEmpty ? "♪" : current).font(.system(size: 13 * scale, weight: .semibold))
                     if let tr = line?.translation, !tr.isEmpty {
                         HStack(spacing: 5) {
                             Image(systemName: "translate").font(.system(size: 9, weight: .semibold))
                                 .padding(.horizontal, 4).padding(.vertical, 1)
                                 .background(Capsule().fill(Color.primary.opacity(0.14)))
-                            Text(tr).font(.system(size: 11).italic())
+                            Text(tr).font(.system(size: 11 * scale).italic())
                         }
                         .foregroundStyle(Color(red: 0.55, green: 0.8, blue: 1).opacity(0.85))
                     } else {
                         let next = np.lyrics[min((i ?? -1) + 1, np.lyrics.count - 1)].text
-                        Text(next).font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.35))
+                        Text(next).font(.system(size: 11 * scale)).foregroundStyle(Color.primary.opacity(0.35))
                     }
                 }
                 .lineLimit(1)
@@ -242,7 +233,7 @@ struct LiveActivityView: View {
     var body: some View {
         let size = IslandGeometry.liveSize(config, lyricWidth: lyricWidth, notch: notch, below: below, dual: dual)
         let art = IslandGeometry.liveArt(config)
-        // Bars double as the idle play/pause button (outside the hover zone, so it never opens the island).
+        // Idle play/pause button (outside the hover zone, so it never opens the island).
         let bars = LivePlayButton(art: art)
         // Visible gap between the wing's outer edge and its content (past the flare).
         let pad = IslandGeometry.livePad()
@@ -298,27 +289,20 @@ struct LiveActivityView: View {
 }
 
 /// The current lyric line; rolls up when the line changes.
-/// Equalizer bars while playing, play icon while paused, pause icon under the pointer. Click = play/pause.
+/// Pause icon while playing, play icon while paused. Click = play/pause.
+/// 0.1.3: static (the equalizer bars were dropped: their animation kept WindowServer busy).
 struct LivePlayButton: View {
     @ObservedObject var np = NowPlaying.shared
-    @StateObject private var hover = HoverFlag()
     let art: CGFloat
 
     var body: some View {
         Button { np.command("playpause") } label: {
-            ZStack {
-                if hover.on || !np.isPlaying {
-                    Image(systemName: np.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: max(art * 0.55, 9), weight: .bold))
-                } else {
-                    EqualizerBars(playing: true).frame(width: art * 0.8, height: art * 0.6)
-                }
-            }
-            .frame(width: art, height: art)
-            .contentShape(Rectangle())
+            Image(systemName: np.isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: max(art * 0.55, 9), weight: .bold))
+                .frame(width: art, height: art)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressScaleStyle())
-        .onHover { hover.on = $0 }
         .help(np.isPlaying ? "Pause" : "Play")
     }
 }
@@ -331,11 +315,13 @@ struct IdleLyricLine: View {
     @ObservedObject var np = NowPlaying.shared
     var alignment: Alignment = .center
     var small = false
+    /// 0.1.3: side placeholders use a smaller line than the idle Emper.
+    var size: CGFloat? = nil
 
     var body: some View {
         let text = np.currentLyric
         Text(text.isEmpty ? "♪" : text)
-            .font(Font(small ? LyricMetrics.smallFont : LyricMetrics.font))
+            .font(size.map { .system(size: $0, weight: .medium) } ?? Font(small ? LyricMetrics.smallFont : LyricMetrics.font))
             .foregroundStyle(Color.primary.opacity(small ? 0.75 : 0.9))
             .lineLimit(1)
             .truncationMode(.tail)
@@ -346,83 +332,6 @@ struct IdleLyricLine: View {
                                     removal: .move(edge: .top).combined(with: .opacity)))
             .animation(.spring(response: 0.35, dampingFraction: 0.85), value: np.lyricIndex)
             .clipped()
-    }
-}
-
-struct EqualizerBars: View {
-    let playing: Bool
-
-    /// Core Animation bars: the bounce runs in the window server, so Emper's main thread does no work per
-    /// frame (the SwiftUI/TimelineView version re-laid out every Emper showing music 15-30 times a second).
-    var body: some View { EqualizerLayerView(playing: playing) }
-}
-
-private struct EqualizerLayerView: NSViewRepresentable {
-    let playing: Bool
-
-    func makeNSView(context: Context) -> EqualizerNSView { EqualizerNSView() }
-    func updateNSView(_ v: EqualizerNSView, context: Context) { v.playing = playing }
-}
-
-final class EqualizerNSView: NSView {
-    private let bars = (0..<4).map { _ in CALayer() }
-    private static let periods: [CFTimeInterval] = [0.62, 0.43, 0.51, 0.37]
-    var playing = false { didSet { if playing != oldValue { restart() } } }
-
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        wantsLayer = true
-        bars.forEach { layer?.addSublayer($0) }
-    }
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var isFlipped: Bool { true }
-
-    override func layout() {
-        super.layout()
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        let n = CGFloat(bars.count), gap = bounds.width * 0.12
-        let w = max((bounds.width - gap * (n - 1)) / n, 1)
-        for (i, b) in bars.enumerated() {
-            b.bounds = CGRect(x: 0, y: 0, width: w, height: bounds.height)
-            b.position = CGPoint(x: CGFloat(i) * (w + gap) + w / 2, y: bounds.midY)
-            b.cornerRadius = w / 2
-        }
-        CATransaction.commit()
-        restart()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        recolor()
-    }
-
-    private func recolor() {
-        var c = NSColor.labelColor.withAlphaComponent(0.9).cgColor
-        effectiveAppearance.performAsCurrentDrawingAppearance { c = NSColor.labelColor.withAlphaComponent(0.9).cgColor }
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        bars.forEach { $0.backgroundColor = c }
-        CATransaction.commit()
-    }
-
-    private func restart() {
-        recolor()
-        for (i, b) in bars.enumerated() {
-            b.removeAllAnimations()
-            CATransaction.begin(); CATransaction.setDisableActions(true)
-            b.transform = CATransform3DMakeScale(1, playing ? 0.5 : 0.2, 1)
-            CATransaction.commit()
-            guard playing else { continue }
-            let a = CABasicAnimation(keyPath: "transform.scale.y")
-            a.fromValue = 0.3
-            a.toValue = 1.0
-            a.duration = Self.periods[i]
-            a.autoreverses = true
-            a.repeatCount = .infinity
-            a.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            a.timeOffset = Double(i) * 0.17
-            b.add(a, forKey: "eq")
-        }
     }
 }
 
@@ -445,5 +354,27 @@ struct MusicSubtitle: View {
             Text(np.hasTrack ? np.artist : (np.status.isEmpty ? "Play something in Spotify or Apple Music" : np.status))
                 .font(.system(size: 11)).foregroundStyle(Color.primary.opacity(0.6)).lineLimit(1)
         }
+    }
+}
+
+/// ✕ beside the controls. Always there so play/pause never shifts; dim and inert until the track is
+/// paused, then it hides that app's track (idle and open) until it plays again (0.1.3).
+struct MusicDismissButton: View {
+    @ObservedObject var np = NowPlaying.shared
+    var size: CGFloat = 11
+    var width: CGFloat = 24
+    var height: CGFloat = 28
+
+    var body: some View {
+        let on = np.hasTrack && !np.isPlaying
+        Button { np.dismiss() } label: {
+            Image(systemName: "xmark").font(.system(size: size, weight: .semibold))
+                .frame(width: width, height: height).contentShape(Rectangle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .foregroundStyle(Color.primary.opacity(on ? 0.6 : 0.18))
+        .disabled(!on)
+        .help(on ? "Hide until it plays again" : "Pause to hide this track")
+        .animation(.easeOut(duration: 0.15), value: on)
     }
 }

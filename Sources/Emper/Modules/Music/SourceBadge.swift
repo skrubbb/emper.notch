@@ -7,14 +7,17 @@ import EmperCore
 struct SourceBadge: View {
     @ObservedObject var np = NowPlaying.shared
     var size: CGFloat = 16
+    /// Hit area around the glyph (defaults match the open Music tab's 28 pt controls).
+    var hitWidth: CGFloat? = nil
+    var hitHeight: CGFloat = 28
 
     var body: some View {
         if np.hasTrack, np.source != .none {
             Button { np.openPlayer() } label: {
                 glyph
                     .frame(width: size, height: size)
-                    // 28 pt tall hit area like the controls next to it.
-                    .frame(width: size + 10, height: 28)
+                    // Hit area as tall as the controls next to it.
+                    .frame(width: hitWidth ?? size + 10, height: hitHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressScaleStyle())

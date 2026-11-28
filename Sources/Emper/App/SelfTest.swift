@@ -37,6 +37,21 @@ enum SelfTest {
         r = SpaceWatcher.evaluate(bars + [app], displays: ds, me: 1, previous: ["B": 60], pointerTop: [])
         check("spaces: menu bar back with the pointer elsewhere = left full screen (maximised window)", r.fsWindow.isEmpty)
         do {
+            // 0.1.3: side-placeholder music picks its layout from the card's inner size (slot minus 8-pt padding).
+            let top = IslandConfig.defaults(for: .top), left = IslandConfig.defaults(for: .left)
+            let h = IslandGeometry.moduleHeight - 16
+            func inner(_ c: IslandConfig, _ sc: CGFloat) -> CGSize {
+                let len = HomeLayout.sideLength(base: HomeLayout.sideBase(c), scale: sc, gap: HomeLayout.gap(c)) - 16
+                return c.edge.isVertical ? CGSize(width: HomeLayout.verticalSideWidth - 16, height: len) : CGSize(width: len, height: h)
+            }
+            let k = [inner(top, 1), inner(top, 1.5), inner(top, 2), inner(left, 1), inner(left, 1.5)].map(MusicCompactView.kind)
+            check("music side layouts: top 1×/1.5×/2× = small/medium+lyric/large, side 1×/1.5× = stack/portrait \(k)",
+                  k == [.small, .mediumLyric, .large, .stack, .portrait])
+            let mid = [inner(top, 1.25), inner(top, 1.75)].map(MusicCompactView.kind)
+            check("music side layouts: in-between sizes 1.25×/1.75× = medium (no lyric)/large \(mid)", mid == [.medium, .large])
+            check("changelog: About keeps the last 5 releases, newest first", Changelog.recent.count <= 5 && Changelog.recent.first?.version == Changelog.all.first?.version)
+        }
+        do {
             let fresh = EmperConfig()
             check("permissions: fresh install has the Bluetooth toast off (no Bluetooth prompt at launch)", !fresh.bluetoothToast)
             check("permissions: fresh install has direct Spotify/Music control off (no Automation prompt at launch)", !fresh.musicAppControl)
@@ -258,6 +273,7 @@ enum SelfTest {
                                 check("shrink off: back to the normal idle", !c.model.isCompact
                                       && c.model.size == IslandGeometry.collapsedSize(c.model.config))
                                 check("music: ✕ hides a paused app until it plays again", NowPlaying.shared.selfTestDismiss())
+                                check("music: a track read at launch shows its source logo", NowPlaying.shared.selfTestLaunchSource())
                                 store.update(screen, .top) { $0.enabled = false }
                                 after(0.3) {
                                     check("toggle off removes the island", manager.controller(for: screen, edge: .top) == nil)
@@ -624,6 +640,48 @@ store.holdExpanded = true
     }
 
     /// Every Settings page, drawn off screen at the default window size.
+    /// 0.1.3: `--render <dir> music` draws only music in a side placeholder at each size (top and left
+    /// Empers, playing and paused) plus the Settings pages, then quits.
+    static func renderMusicCards(manager: IslandManager, store: ConfigStore, dock: DockMonitor, to dir: URL) {
+        manager.followsRealPointer = false
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let screen = NSScreen.screens.first else { exit(1) }
+        func shot(_ edge: IslandEdge, _ name: String) {
+            guard let c = manager.controller(for: screen, edge: edge), let v = c.panel.contentView,
+                  let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) else { return }
+            v.cacheDisplay(in: v.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+        }
+        let np = NowPlaying.shared
+        np.simulate(title: "A Rather Long Song Title", playing: true)
+        np.simulateLyrics([LyricLine(time: 0, text: "First line of the song"), LyricLine(time: 60, text: "And the next one after it")])
+        store.setGlobal { $0.lyricsEnabled = true }
+        store.update(screen, .left) { $0.enabled = true; $0.moduleIDs = ["music", "stats"] }
+        store.holdExpanded = true
+        var steps: [(IslandEdge, Double, Bool)] = []
+        for s in [1.0, 1.25, 1.5, 2.0] { steps.append((.top, s, true)) }
+        steps.append((.top, 1.0, false))
+        for s in [1.0, 1.5] { steps.append((.left, s, true)) }
+        steps.append((.left, 1.5, false))
+        func run(_ i: Int) {
+            guard i < steps.count else {
+                store.holdExpanded = false
+                renderSettings(store: store, dock: dock, to: dir)
+                exit(0)
+            }
+            let (edge, sc, playing) = steps[i]
+            np.simulate(title: "A Rather Long Song Title", playing: playing)
+            np.simulateLyrics([LyricLine(time: 0, text: "First line of the song"), LyricLine(time: 60, text: "And the next one after it")])
+            store.update(screen, edge) { $0.homeEnabled = true; $0.homeSlots = ["music", "stats"]; $0.homeSizes = [sc, 1]; $0.homeMain = 1 }
+            after(0.4) { manager.controller(for: screen, edge: edge)?.select(ModuleRegistry.homeID) }
+            after(1.2) {
+                shot(edge, "music-\(edge)-\(sc)x" + (playing ? "" : "-paused"))
+                run(i + 1)
+            }
+        }
+        after(1.0) { run(0) }
+    }
+
     private static func renderSettings(store: ConfigStore, dock: DockMonitor, to dir: URL) {
         for page in SettingsPage.allCases {
             let v = NSHostingView(rootView: SettingsView(store: store, dock: dock, page: page))

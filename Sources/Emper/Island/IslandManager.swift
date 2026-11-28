@@ -91,7 +91,7 @@ final class IslandManager {
                     let all = (cfg.moduleIDs + cfg.homeSlots).filter { ModuleRegistry.descriptor($0) != nil }
                     usesClipboard = usesClipboard || all.contains("clipboard")
                     usesShelf = usesShelf || all.contains(ModuleRegistry.screenshotsID)
-                    usesMusic = usesMusic || cfg.musicDetection || all.contains(ModuleRegistry.musicID)
+                    usesMusic = usesMusic || all.contains(ModuleRegistry.musicID)
                     alive.insert(k)
                     let notch = edge == .top ? (screen.notchSize?.height ?? 0) : 0
                     var c2 = cfg
@@ -139,10 +139,12 @@ final class IslandManager {
             controllers[k] = nil
         }
         if !selfTest {
+            // Music › Players: with direct control off, any app is always on (0.1.3: both off reads as "Any app").
+            let anyApp = store.config.systemAudio || !store.config.musicAppControl
             ClipboardHistory.shared.setActive(usesClipboard)
             ScreenshotShelf.shared.setDestination(store.config.screenshotFolder.map { URL(fileURLWithPath: $0, isDirectory: true) })
             ScreenshotShelf.shared.setActive(usesShelf)
-            NowPlaying.shared.systemAudioOn = usesMusic && store.config.systemAudio
+            NowPlaying.shared.systemAudioOn = usesMusic && anyApp
             // Primed once per opt-in, so turning control on picks up what is already playing.
             if usesMusic, store.config.musicAppControl, !musicPrimed {
                 musicPrimed = true
@@ -151,7 +153,7 @@ final class IslandManager {
             if !store.config.musicAppControl { musicPrimed = false }
             NowPlaying.enableAppControl = { [weak self] in self?.store.setGlobal { $0.musicAppControl = true } }
             SystemMedia.shared.onInfo = { NowPlaying.shared.applySystem($0) }
-            SystemMedia.shared.setActive(usesMusic && store.config.systemAudio)
+            SystemMedia.shared.setActive(usesMusic && anyApp)
             BluetoothMonitor.shared.onConnect = { [weak self] e in self?.showBluetooth(e) }
             BluetoothMonitor.shared.setActive(store.config.bluetoothToast)
             SpaceWatcher.shared.setActive(store.config.hideInMissionControl || store.config.showInFullScreen)

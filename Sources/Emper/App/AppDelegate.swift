@@ -52,7 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Idle cost check on a temp config: `--bench timer|music|both` keeps that live state on the idle island.
             SelfTest.bench(manager: islands, mode: CommandLine.arguments.count > i + 1 ? CommandLine.arguments[i + 1] : "timer")
         } else if let i = CommandLine.arguments.firstIndex(of: "--render"), CommandLine.arguments.count > i + 1 {
-            SelfTest.render(manager: islands, store: store, dock: dock, to: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            let dir = URL(fileURLWithPath: CommandLine.arguments[i + 1])
+            if CommandLine.arguments.count > i + 2, CommandLine.arguments[i + 2] == "music" {
+                SelfTest.renderMusicCards(manager: islands, store: store, dock: dock, to: dir)
+            } else {
+                SelfTest.render(manager: islands, store: store, dock: dock, to: dir)
+            }
         } else if CommandLine.arguments.contains("--zones") {
             SelfTest.dumpZones(manager: islands)
         } else if selfTest {

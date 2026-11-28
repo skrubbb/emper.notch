@@ -235,10 +235,10 @@ final class IslandController {
     /// Live while playing, and for `pauseGrace` after a pause so the idle play button can resume it.
     private var liveNow: Bool {
         let np = NowPlaying.shared
-        // Any top/bottom Emper that shows music (Home on, a Music tab, or music detection); never the side ones.
+        // 0.1.3: any top/bottom Emper with Music as a tab or a Home placeholder (the separate "Show music
+        // while it plays" switch is gone); never the side ones.
         let c = model.config
-        guard !compact, !c.edge.isVertical, np.hasTrack,
-              usesHome || c.moduleIDs.contains(ModuleRegistry.musicID) || c.musicDetection else { return false }
+        guard !compact, !c.edge.isVertical, np.hasTrack, showsMusic else { return false }
         if np.isPlaying { return true }
         return pausedAt.map { Date().timeIntervalSince($0) < Self.pauseGrace } ?? false
     }
@@ -254,6 +254,11 @@ final class IslandController {
         let tabs = model.config.moduleIDs.contains { ModuleRegistry.descriptor($0) != nil && $0 != ModuleRegistry.homeID }
         return model.config.homeEnabled || !tabs
     }
+    /// Music is a tab, or a placeholder on the Home this Emper opens on.
+    private var showsMusic: Bool {
+        model.config.moduleIDs.contains(ModuleRegistry.musicID)
+            || (usesHome && model.config.homeSlots.contains(ModuleRegistry.musicID))
+    }
     /// Tab that shows the music: Home when music has a placeholder, else its own tab.
     private var musicTab: String? {
         if usesHome, model.config.homeSlots.contains(ModuleRegistry.musicID) { return ModuleRegistry.homeID }
@@ -268,11 +273,7 @@ final class IslandController {
         var ids = model.config.moduleIDs.filter {
             ModuleRegistry.descriptor($0) != nil && $0 != ModuleRegistry.homeID && seen.insert($0).inserted
         }
-        if usesHome {
-            ids.insert(ModuleRegistry.homeID, at: 0)
-        } else if model.config.musicDetection, np.hasTrack, !ids.contains(ModuleRegistry.musicID) {
-            ids.insert(ModuleRegistry.musicID, at: 0)
-        }
+        if usesHome { ids.insert(ModuleRegistry.homeID, at: 0) }
         if ids != tabIDs || slots != slotIDs {
             let needed = Set(ids + slots)
             for (id, m) in instances where !needed.contains(id) {

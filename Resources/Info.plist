@@ -2,25 +2,45 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Emper</string>
-    <key>CFBundleDisplayName</key><string>Emper</string>
-    <key>CFBundleIdentifier</key><string>com.skrubbb.emper</string>
-    <key>CFBundleExecutable</key><string>Emper</string>
-    <key>CFBundleIconFile</key><string>Emper</string>
-    <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.2</string>
-    <key>CFBundleVersion</key><string>3</string>
-    <key>SUFeedURL</key><string>https://github.com/skrubbb/emper.notch/releases/latest/download/appcast.xml</string>
-    <key>SUPublicEDKey</key><string>jEmZ2cYq0no6AeIl2J6fenGevXpI5OZ+mB36/ZOwIaI=</string>
-    <key>SUEnableAutomaticChecks</key><false/>
-    <key>SUAutomaticallyUpdate</key><false/>
-    <key>SUAllowsAutomaticUpdates</key><false/>
-    <key>LSMinimumSystemVersion</key><string>14.0</string>
-    <key>LSUIElement</key><true/>
-    <key>NSHighResolutionCapable</key><true/>
-    <key>NSBluetoothAlwaysUsageDescription</key><string>Emper shows a short notice in the island when a Bluetooth device connects, with its battery level when macOS reports it.</string>
-    <key>NSRemindersFullAccessUsageDescription</key><string>Emper adds the reminders you type in its Reminder placeholder to Apple Reminders, then reads each one back to confirm it was added.</string>
-    <key>NSRemindersUsageDescription</key><string>Emper adds the reminders you type in its Reminder placeholder to Apple Reminders, then reads each one back to confirm it was added.</string>
-    <key>NSAppleEventsUsageDescription</key><string>Emper reads what Spotify or Apple Music is playing and controls playback (play, pause, next, previous) from the island.</string>
+	<key>CFBundleDisplayName</key>
+	<string>Emper</string>
+	<key>CFBundleExecutable</key>
+	<string>Emper</string>
+	<key>CFBundleIconFile</key>
+	<string>Emper</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.skrubbb.emper</string>
+	<key>CFBundleName</key>
+	<string>Emper</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.3</string>
+	<key>CFBundleVersion</key>
+	<string>4</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Emper reads what Spotify or Apple Music is playing and controls playback (play, pause, next, previous) from the island.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Emper shows a short notice in the island when a Bluetooth device connects, with its battery level when macOS reports it.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Emper adds the reminders you type in its Reminder placeholder to Apple Reminders, then reads each one back to confirm it was added.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Emper adds the reminders you type in its Reminder placeholder to Apple Reminders, then reads each one back to confirm it was added.</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/skrubbb/emper.notch/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>jEmZ2cYq0no6AeIl2J6fenGevXpI5OZ+mB36/ZOwIaI=</string>
 </dict>
 </plist>
