@@ -5,7 +5,7 @@ A free, open-source (GPL-3.0) dynamic island for the edges of your Mac screen. O
 
 Emper started as a tool for my own Mac. Synced lyrics, a screenshot shelf and an island on every screen edge are just a few of the things I wanted. It's shaped by what I use every day, so it won't cover every use case. Ideas and issues are welcome.
 
-Status: **early prototype (v0.1.2)**. Expect rough edges.
+Status: **early prototype (v0.1.3)**. Expect rough edges.
 
 ![Emper opening on hover and closing when the pointer leaves](docs/screenshots/hover-unhover.gif)
 
@@ -15,7 +15,7 @@ Status: **early prototype (v0.1.2)**. Expect rough edges.
 
 Emper is a young project. Each feature is marked with how well it has been tested.
 
-| Area | v0.1.2 |
+| Area | v0.1.3 |
 |---|---|
 | Hover / un-hover open and close, edge placement | Tested |
 | Multiple displays (one Emper set per display) | Tested |
@@ -27,7 +27,7 @@ Emper is a young project. Each feature is marked with how well it has been teste
 | **Full screen**: the Emper shrinks to a thin line with no idle activity; push the cursor against the edge to open it | Included, not yet tested by hand |
 | **Hide in Mission Control** (no permission needed; checked once a second) | Included |
 | **Shrink** button (beside the pencil): keep an Emper as the thin full-screen line until you push the cursor against the edge, for apps macOS doesn't report as full screen | Included, not yet tested by hand |
-| Reminder, Timer, Calculator, Clipboard history, File shelf, System stats | In the code, **hidden in v0.1.2** (experimental) |
+| Reminder, Timer, Calculator, Clipboard history, File shelf, System stats | In the code, **hidden in v0.1.3** (experimental) |
 
 **Synced lyrics** (optional, Settings › Music): the current line follows the song under the open Emper, and inside
 the idle Emper.
@@ -92,7 +92,7 @@ settings file is kept as a backup; your Quick Note and screenshots are not touch
   - **Files** (Desktop): the **Allow Access** button in the Screenshots tab.
   - **Automation** (Spotify / Apple Music): off by default, because music is followed through macOS's Now
     Playing with no permission. The Music tab shows **Allow Spotify & Apple Music control** only when that is
-    not enough; the same switch is in Settings › Music.
+    not enough; the same choice is the **Players** menu in Settings › Music.
   - **Bluetooth**: the Bluetooth toast is off by default; macOS asks when you turn it on.
   - Emper needs no Accessibility permission. The hidden experimental features may additionally ask for Reminders.
 

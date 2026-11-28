@@ -6,3 +6,4 @@ build/
 *.log
 .sparkle-tools/
 graphify-out/
+internal/
