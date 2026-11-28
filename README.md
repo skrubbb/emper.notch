@@ -1,4 +1,4 @@
-# Emper.notch
+# Emper Notch
 
 A free, open-source (GPL-3.0) dynamic island for the edges of your Mac screen. One small "Emper" per screen edge
 (top, left, right, bottom) and per display. It expands on hover into a set of tabs.
